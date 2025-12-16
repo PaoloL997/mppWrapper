@@ -26,7 +26,7 @@ class MSProjectWrapper:
         self.app.FileOpen(path)
         self.project = self.app.ActiveProject
     
-    def get_tasks(self):
+    def tasks(self):
         """Retrieve all tasks from the project.
         
         Returns:
@@ -58,7 +58,7 @@ class MSProjectWrapper:
                 )
         return out
 
-    def get_resources(self):
+    def resources(self):
         """Retrieve all resources from the project.
         
         Returns:
@@ -83,7 +83,7 @@ class MSProjectWrapper:
                 )
         return out
     
-    def get_task(self, name: str):
+    def retrieve_task(self, name: str):
         """Retrieve a specific task by name.
         
         Args:
@@ -98,7 +98,7 @@ class MSProjectWrapper:
         except Exception as e:
             return NameError(f"Unable to find task {name}: {e}")
 
-    def get_resource_id(self, resource_name: str):
+    def retrieve_resource_id(self, resource_name: str):
         """Get the ID of a resource by its name.
         
         Args:
@@ -111,7 +111,7 @@ class MSProjectWrapper:
                 return res.ID
         return None
     
-    def get_task_id(self, task_name: str):
+    def retrieve_task_id(self, task_name: str):
         """Get the ID of a task by its name.
         
         Args:
@@ -124,7 +124,7 @@ class MSProjectWrapper:
                 return task.ID
         return None
     
-    def add_task(
+    def append_task(
             self,
             name: str,
             start: datetime,
@@ -156,7 +156,7 @@ class MSProjectWrapper:
             while new_task.OutlineLevel > 1:
                 new_task.OutlineOutdent() # Altrimenti utilizza quella precedente
 
-    def add_resources_to_task(
+    def assign_resources(
             self,
             task: win32com.client.CDispatch,
             resourceIDs: list[int]
@@ -170,7 +170,7 @@ class MSProjectWrapper:
         for res in resourceIDs:
             task.Assignments.Add(task.ID, res)
 
-    def add_resource(
+    def append_resource(
             self,
             name: str,
             warehouse: str,
@@ -196,7 +196,7 @@ class MSProjectWrapper:
             new_resource.Number3 = diameter
         new_resource.Text1 = warehouse
 
-    def check_resource_availability(
+    def check_availability(
             self,
             resource_id: int,
             start: datetime,
@@ -251,4 +251,65 @@ class MSProjectWrapper:
             res.delete()
             return True
         return False
+    
+    def query(
+        self,
+        *,
+        category: str | None = None,
+        warehouse: str | None = None,
+        min_diameter: float | None = None,
+        max_diameter: float | None = None,
+        pitch: float | None = None,
+        center_to_center: float | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ):
+        """Query resources based on specified criteria.
+        
+        Args:
+            category: Filter by resource category (Text2 field).
+            warehouse: Filter by warehouse (Text1 field).
+            min_diameter: Minimum diameter (Number3 field).
+            max_diameter: Maximum diameter (Number3 field).
+            pitch: Exact pitch value (Number1 field).
+            center_to_center: Exact center-to-center distance (Number2 field).
+            start: Start date for availability check.
+            end: End date for availability check.
+        """
+        out = []
+
+        for res in self.project.Resources:
+            if res is None:
+                continue
+
+            if category and res.Text2 != category:
+                continue
+            if warehouse and res.Text1 != warehouse:
+                continue
+
+            if min_diameter and res.Number3 < min_diameter:
+                continue
+            if max_diameter and res.Number3 > max_diameter:
+                continue
+            if pitch and res.Number1 != pitch:
+                continue
+            if center_to_center and res.Number2 != center_to_center:
+                continue
+
+            if start and end:
+                if not self.check_availability(res.ID, start, end):
+                    continue
+            out.append(
+                {
+                    "risorsa":res.Name,
+                    "categoria":res.Text2,
+                    "passo": res.Number1,
+                    "distanza_interasse": res.Number2,
+                    "diametro": res.Number3,
+                    "stabilimento": res.Text1
+                }
+                 )
+
+        return out
+
         
