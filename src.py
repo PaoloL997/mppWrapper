@@ -9,6 +9,13 @@ class MSProjectWrapper:
     This class provides methods to read, create, modify, and delete tasks and resources
     in Microsoft Project files using the win32com client.
     """
+    CATEGORIES = [
+        "Tastatore",
+        "Mandrino",
+        "Maschera",
+        "Testa",
+        "Generatore"
+    ]
     
     def __init__(self, path: str):
         """Initialize the MSProject wrapper and open a project file. 
@@ -25,6 +32,26 @@ class MSProjectWrapper:
             raise FileNotFoundError(f"{path} not found.")
         self.app.FileOpen(path)
         self.project = self.app.ActiveProject
+    
+    def close(self):
+        """Close the Microsoft Project application and save the project."""
+        try:
+            self.project.Save()
+            self.app.Quit()
+        except:
+            pass
+    
+    def __del__(self):
+        """Destructor to ensure proper cleanup when the object is destroyed."""
+        self.close()
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, *_):
+        """Context manager exit with automatic cleanup."""
+        self.close()
     
     def tasks(self):
         """Retrieve all tasks from the project.
@@ -68,17 +95,23 @@ class MSProjectWrapper:
                 - distanza_interasse: Center-to-center distance (Number2 field)
                 - diametro: Diameter (Number3 field)
                 - stabilimento: Warehouse (Text1 field)
+                - categoria: Category (Text2 field)
+                - modello: Model (Text3 field)
         """
         out = []
         for res in self.project.Resources:
             if res is not None:
                 out.append(
                     {
+                        "categoria": res.Text2,
                         "risorsa":res.Name,
+                        "modello": res.Text3,
                         "passo": res.Number1,
                         "distanza_interasse": res.Number2,
                         "diametro": res.Number3,
-                        "stabilimento": res.Text1
+                        "max": res.Number4,
+                        "stabilimento": res.Text1,
+                        "note": res.Notes # TODO: da testare
                     }
                 )
         return out
@@ -173,21 +206,30 @@ class MSProjectWrapper:
     def append_resource(
             self,
             name: str,
+            category: str, # TODO: da aggiungere
             warehouse: str,
             diameter: float | None = None,
             pitch: float | None = None,
             center_to_center: float | None = None,
+            model: str | None = None, # TODO: da aggiungere
+            max: float | None = None, # TODO: da aggiungere
+            note: str | None = None # TODO: da aggiungere
             ):
         """Add a new resource to the project.
         
         Args:
             name: The name of the new resource.
+            category: The category of the resource.
             warehouse: The warehouse identifier (stored in Text1 field).
             diameter: Optional diameter value (stored in Number3 field).
             pitch: Optional pitch value (stored in Number1 field).
             center_to_center: Optional center-to-center distance (stored in Number2 field).
+            model: Head/Generator model (None if not present).
         """
+        if category not in self.CATEGORIES:
+            raise ValueError(f"Category '{category}' is not valid. Choose from {self.CATEGORIES}.")
         new_resource = self.project.Resources.Add(name)
+        new_resource.Text2 = category
         if pitch:
             new_resource.Number1 = pitch
         if center_to_center:
@@ -195,6 +237,12 @@ class MSProjectWrapper:
         if diameter:
             new_resource.Number3 = diameter
         new_resource.Text1 = warehouse
+        if model:
+            new_resource.Text3 = model
+        if max:
+            new_resource.Number4 = max
+        if note:
+            new_resource.Notes = note
 
     def check_availability(
             self,
@@ -261,6 +309,7 @@ class MSProjectWrapper:
         max_diameter: float | None = None,
         pitch: float | None = None,
         center_to_center: float | None = None,
+        model: str | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
     ):
@@ -276,6 +325,7 @@ class MSProjectWrapper:
             start: Start date for availability check.
             end: End date for availability check.
         """
+        # TODO: refinement
         out = []
 
         for res in self.project.Resources:
@@ -295,18 +345,23 @@ class MSProjectWrapper:
                 continue
             if center_to_center and res.Number2 != center_to_center:
                 continue
+            if model and res.Text3 != model:
+                continue
 
             if start and end:
                 if not self.check_availability(res.ID, start, end):
                     continue
             out.append(
                 {
-                    "risorsa":res.Name,
-                    "categoria":res.Text2,
+                    "categoria": res.Text2,
+                    "risorsa": res.Name,
+                    "modello": res.Text3,
                     "passo": res.Number1,
                     "distanza_interasse": res.Number2,
                     "diametro": res.Number3,
-                    "stabilimento": res.Text1
+                    "max": res.Number4,
+                    "stabilimento": res.Text1,
+                    "note": res.Notes
                 }
                  )
 

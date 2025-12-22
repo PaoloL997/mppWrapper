@@ -20,7 +20,16 @@ poetry install
 from src import MSProjectWrapper
 from datetime import datetime
 
+# Open project file
+with MSProjectWrapper(path="path/to/your/project.mpp") as ms:
+    # Work with the project
+    # File is automatically saved and closed when exiting the 'with' block
+    pass
+
+# Or use manually:
 ms = MSProjectWrapper(path="path/to/your/project.mpp")
+# ... work with project
+ms.close()  # Saves and closes the project
 ```
 
 ### Tasks
@@ -53,21 +62,22 @@ ms.delete_task(task_id)
 ```python
 # Get all resources
 resources = ms.resources()
-# Returns list of dicts with: risorsa, passo, distanza_interasse, diametro, stabilimento
+# Returns list of dicts with: categoria, risorsa, modello, passo, distanza_interasse, diametro, max, stabilimento, note
 
 # Get resource ID
 resource_id = ms.retrieve_resource_id("Resource Name")
 
 # Add resource
-# - diameter: for mandrino/tastatore
-# - pitch and center_to_center: for maschera
-# - all None: for others (Testa/Generatore)
 ms.append_resource(
     name="New Resource",
+    category="Tastatore",  # Valid categories: Tastatore, Mandrino, Maschera, Testa, Generatore
     warehouse="Warehouse B",
     diameter=12.5,  # Optional
     pitch=2.0,  # Optional
-    center_to_center=3.5  # Optional
+    center_to_center=3.5,  # Optional
+    model="Model123",  # Optional
+    max=100.0,  # Optional
+    note="Some notes"  # Optional
 )
 
 # Delete resource
@@ -85,12 +95,13 @@ is_available = ms.check_availability(
 
 # Query resources with filters
 results = ms.query(
-    category="Category",  # Optional
+    category="Tastatore",  # Optional
     warehouse="Warehouse A",  # Optional
     min_diameter=10.0,  # Optional
     max_diameter=20.0,  # Optional
     pitch=2.0,  # Optional
     center_to_center=3.5,  # Optional
+    model="Model123",  # Optional
     start=datetime(2025, 1, 1),  # Optional (requires end)
     end=datetime(2025, 1, 31)  # Optional (requires start)
 )
@@ -104,7 +115,10 @@ results = ms.query(
 
 ### Resources
 - `Text1`: Stabilimento (Warehouse)
-- `Text2`: Categoria (Category)
+- `Text2`: Categoria (Category) - Valid values: Tastatore, Mandrino, Maschera, Testa, Generatore
+- `Text3`: Modello (Model)
 - `Number1`: Passo (Pitch)
 - `Number2`: Distanza Interasse (Center-to-center distance)
 - `Number3`: Diametro (Diameter)
+- `Number4`: Max
+- `Notes`: Note aggiuntive
